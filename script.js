@@ -285,7 +285,7 @@ async function main() {
     });
 }
 
-main();*/
+main();
 console.log("Lets write java script");
 
 let currentSong = new Audio();
@@ -465,6 +465,180 @@ async function main() {
     });
 
     // RESPONSIVE MENU
+    document.querySelector(".hamburgerContainer").addEventListener("click", () => {
+        document.querySelector(".left").style.left = "0";
+    });
+
+    document.querySelector(".close").addEventListener("click", () => {
+        document.querySelector(".left").style.left = "-130%";
+    });
+}
+
+main();*/
+console.log("Lets write java script");
+
+let currentSong = new Audio();
+let songs = [];
+let currFolder;
+
+// ---------------- TIME FORMAT ----------------
+function secondsToMinutesSeconds(seconds) {
+    if (isNaN(seconds) || seconds < 0) return "00:00";
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+// ---------------- GET SONGS (NETLIFY FIX) ----------------
+async function getSongs(folder) {
+    currFolder = folder;
+    
+    // Netlify par kabhi "songs/ncs" chalta hai toh kabhi "/songs/ncs"
+    // Isliye hum seedhe songs.json mang rahe hain
+    let response = await fetch(`/${folder}/songs.json`);
+    songs = await response.json();
+
+    let songUL = document.querySelector(".songlist ul");
+    songUL.innerHTML = "";
+
+    for (let song of songs) {
+        let displayName = decodeURI(song);
+        songUL.innerHTML += `
+        <li>
+            <img class="invert" src="music.svg" width="30">
+            <div class="info">
+                <div>${displayName}</div>
+            </div>
+            <div class="playnow">
+                <span>Play Now</span>
+                <img class="invert" src="play.svg" width="20">
+            </div>
+        </li>`;
+    }
+
+    // LIST CLICK EVENT
+    document.querySelectorAll(".songlist li").forEach(li => {
+        li.addEventListener("click", () => {
+            let trackName = li.querySelector(".info div").innerText.trim();
+            playMusic(trackName);
+        });
+    });
+
+    return songs;
+}
+
+// ---------------- PLAY MUSIC ----------------
+function playMusic(track, pause = false) {
+    // Current folder ke aage track ka naam jodna (Correct Path)
+    currentSong.src = `/${currFolder}/` + track;
+
+    if (!pause) {
+        currentSong.play();
+        document.getElementById("play").src = "pause.svg";
+    }
+
+    document.querySelector(".songinfo").innerText = decodeURI(track);
+    document.querySelector(".songtime").innerText = "00:00 / 00:00";
+}
+
+// ---------------- DISPLAY ALBUMS ----------------
+async function displayAlbums() {
+    let response = await fetch("/songs/albums.json");
+    let folders = await response.json();
+    let cardContainer = document.querySelector(".cardContainer");
+    cardContainer.innerHTML = "";
+
+    for (let folder of folders) {
+        try {
+            let info = await fetch(`/songs/${folder}/info.json`);
+            let data = await info.json();
+
+            cardContainer.innerHTML += `
+                <div data-folder="${folder}" class="card">
+                    <div class="play">
+                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5 20V4L19 12L5 20Z" fill="#000" stroke="#141B34" stroke-width="1.5" stroke-linejoin="round" />
+                        </svg>
+                    </div>
+                    <img src="/songs/${folder}/cover.jpg" alt="">
+                    <h2>${data.title}</h2>
+                    <p>${data.description}</p>
+                </div>`;
+        } catch (err) {
+            console.log("Album load error:", folder);
+        }
+    }
+
+    // CARD CLICK EVENT
+    document.querySelectorAll(".card").forEach(card => {
+        card.addEventListener("click", async () => {
+            let folder = card.dataset.folder;
+            songs = await getSongs(`songs/${folder}`);
+            if (songs.length > 0) playMusic(songs[0]);
+        });
+    });
+}
+
+// ---------------- MAIN ----------------
+async function main() {
+    // Initial load for NCS (NCS ko delete mat karna)
+    await getSongs("songs/ncs");
+    if (songs.length > 0) playMusic(songs[0], true);
+
+    await displayAlbums();
+
+    // PLAY/PAUSE
+    document.getElementById("play").addEventListener("click", () => {
+        if (currentSong.paused) {
+            currentSong.play();
+            document.getElementById("play").src = "pause.svg";
+        } else {
+            currentSong.pause();
+            document.getElementById("play").src = "play.svg";
+        }
+    });
+
+    // NEXT SONG
+    document.getElementById("next").addEventListener("click", () => {
+        // Decode karke index check karna taaki space wala issue na aaye
+        let currentTrack = decodeURI(currentSong.src.split("/").pop());
+        let index = songs.indexOf(currentTrack);
+
+        if ((index + 1) < songs.length) {
+            playMusic(songs[index + 1]);
+        }
+    });
+
+    // PREVIOUS SONG
+    document.getElementById("previous").addEventListener("click", () => {
+        let currentTrack = decodeURI(currentSong.src.split("/").pop());
+        let index = songs.indexOf(currentTrack);
+
+        if ((index - 1) >= 0) {
+            playMusic(songs[index - 1]);
+        }
+    });
+
+    // TIME & SEEKBAR
+    currentSong.addEventListener("timeupdate", () => {
+        document.querySelector(".songtime").innerText =
+            `${secondsToMinutesSeconds(currentSong.currentTime)} / ${secondsToMinutesSeconds(currentSong.duration)}`;
+        document.querySelector(".circle").style.left =
+            (currentSong.currentTime / currentSong.duration) * 100 + "%";
+    });
+
+    document.querySelector(".seekbar").addEventListener("click", e => {
+        let percent = (e.offsetX / e.target.getBoundingClientRect().width) * 100;
+        document.querySelector(".circle").style.left = percent + "%";
+        currentSong.currentTime = (currentSong.duration * percent) / 100;
+    });
+
+    // VOLUME
+    document.querySelector(".range input").addEventListener("input", e => {
+        currentSong.volume = e.target.value / 100;
+    });
+
+    // MENU CONTROLS
     document.querySelector(".hamburgerContainer").addEventListener("click", () => {
         document.querySelector(".left").style.left = "0";
     });
